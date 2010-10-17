@@ -7,7 +7,7 @@ package object core {
      * Type of pipeline segments which consume some input and can in reaction fail (Left(throwable)), succeed with some result (Right(Some(x)))
      * or opt not to handle the input (Right(None))
      */
-    type ===>[A, B] = A => Error[Option[B]]
+    type ===>[-A, +B] = A => Error[Option[B]]
 }
 
 package core {
