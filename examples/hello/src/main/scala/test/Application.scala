@@ -1,8 +1,8 @@
 package test
 
 import scala.xml.NodeSeq
-import com.dridus.piper.web.Basic.{notFound, sendXML}
 import com.dridus.piper.web.Paths
+import com.dridus.piper.web.basic.{notFound, sendXML}
 import com.dridus.piper.web.core.{===>, Request, Response}
 import com.dridus.piper.web.core.Pipeline.pipelineOps
 import com.dridus.piper.web.servlet.Filter

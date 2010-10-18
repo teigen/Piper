@@ -1,6 +1,7 @@
 package com.dridus.piper.web
 
 import com.dridus.piper.utils.Error
+import com.dridus.piper.utils.hlist.HList
 import com.dridus.piper.web.core.{===>, Request, Response}
 
 /**
@@ -22,8 +23,8 @@ import com.dridus.piper.web.core.{===>, Request, Response}
  */
 object Paths {
     /** Combine all the given pipelines alternatives */
-    def apply[A](alternatives: Request ===> A*): Request ===> A =
-        in => alternatives.foldLeft[Error[Option[A]]](Right(None))((prev, f) => prev match {
+    def apply[A <: HList, B](alternatives: Request[A] ===> B*): Request[A] ===> B =
+        in => alternatives.foldLeft[Error[Option[B]]](Right(None))((prev, f) => prev match {
             case Right(None) => f(in)
             case other => other
         })
@@ -31,12 +32,12 @@ object Paths {
     /** Object that can be used to apply partial functions to the root, or dispatch for no path segments */
     object root {
         /** Dispatch to the given pipeline if the path to match is empty */
-        def apply[A](rhs: Request ===> A): Request ===> A =
-            in => if (in.path.isEmpty) rhs(in)
+        def apply[A <: HList, B](rhs: Request[A] ===> B): Request[A] ===> B =
+            in => if (in.matchPath.isEmpty) rhs(in)
                   else Right(None)
 
         /** Dispatch to the given pipeline if the path to match is empty */
-        def apply[A](rhs: PartialFunction[String, Request ===> A]): Request ===> A = dispatchPF(rhs)
+        def apply[A <: HList, B](rhs: PartialFunction[String, Request[A] ===> B]): Request[A] ===> B = dispatchPF(rhs)
 
         /**
          * Delegate to one of the given pipelines to match the head path segment
@@ -47,7 +48,7 @@ object Paths {
          *   case "zippy" => handle foo/bar/zippy
          * }
          */
-        def / [A](rhs: PartialFunction[String, Request ===> A]): Request ===> A = delegatePF(rhs)
+        def / [A <: HList, B](rhs: PartialFunction[String, Request[A] ===> B]): Request[A] ===> B = delegatePF(rhs)
     }
 
     /** Add operators applicable to a path segment */
@@ -60,9 +61,9 @@ object Paths {
      */
     final class PathSegmentOps(lhs: String) {
         /** Delegate to the given pipeline if the current path segment is equal to the string */
-        def / [A](rhs: Request ===> A): Request ===> A = 
-            in => in.path match {
-                case head :: rest if head == lhs => rhs(in.copy(path=rest))
+        def / [A <: HList, B](rhs: Request[A] ===> B): Request[A] ===> B = 
+            in => in.matchPath match {
+                case head :: rest if head == lhs => rhs(in.copy(matchPath=rest))
                 case _ => Right(None)
             }
 
@@ -78,11 +79,11 @@ object Paths {
          *   case "zippy" => handle foo/bar/zippy
          * }
          */
-        def / [A](rhs: PartialFunction[String, Request ===> A]): Request ===> A = this / delegatePF(rhs)
+        def / [A <: HList, B](rhs: PartialFunction[String, Request[A] ===> B]): Request[A] ===> B = this / delegatePF(rhs)
 
         /** Dispatch to the given pipeline if the current path segment is equal to the string */
-        def -> [A](rhs: Request ===> A): Request ===> A =
-            in => in.path match {
+        def -> [A <: HList, B](rhs: Request[A] ===> B): Request[A] ===> B =
+            in => in.matchPath match {
                 case head :: rest if head == lhs => rhs(in)
                 case _ => Right(None)
             }
@@ -96,7 +97,7 @@ object Paths {
          *   case "zippy" => handle foo/bar/zippy
          * }
          */
-        def -> [A](rhs: PartialFunction[String, Request ===> A]): Request ===> A = this / dispatchPF(rhs)
+        def -> [A <: HList, B](rhs: PartialFunction[String, Request[A] ===> B]): Request[A] ===> B = this / dispatchPF(rhs)
     }
 
     /** Add operators applicable to a path prefix */
@@ -109,8 +110,8 @@ object Paths {
      */
     final class PathPrefixOps(lhs: List[String]) {
         /** Delegate to the given pipeline if the current path has the prefix */
-        def / [A](rhs: Request ===> A): Request ===> A =
-            in => if (in.path.startsWith(lhs)) rhs(in.copy(path=in.path.drop(lhs.length)))
+        def / [A <: HList, B](rhs: Request[A] ===> B): Request[A] ===> B =
+            in => if (in.matchPath.startsWith(lhs)) rhs(in.copy(matchPath=in.matchPath.drop(lhs.length)))
                   else Right(None)
 
         /**
@@ -122,11 +123,11 @@ object Paths {
          *   case "zippy" => handle foo/bar/zippy
          * }
          */
-        def / [A](rhs: PartialFunction[String, Request ===> A]): Request ===> A = this / delegatePF(rhs)
+        def / [A <: HList, B](rhs: PartialFunction[String, Request[A] ===> B]): Request[A] ===> B = this / delegatePF(rhs)
 
         /** Dispatch to the given pipeline if the current path has the prefix */
-        def -> [A](rhs: Request ===> A): Request ===> A =
-            in => if (in.path.startsWith(lhs)) rhs(in.copy(path=in.path.drop(lhs.length)))
+        def -> [A <: HList, B](rhs: Request[A] ===> B): Request[A] ===> B =
+            in => if (in.matchPath.startsWith(lhs)) rhs(in.copy(matchPath=in.matchPath.drop(lhs.length)))
                   else Right(None)
 
         /**
@@ -138,7 +139,7 @@ object Paths {
          *   case "zippy" => handle foo/bar/zippy
          * }
          */
-        def -> [A](rhs: PartialFunction[String, Request ===> A]): Request ===> A = this / dispatchPF(rhs)
+        def -> [A <: HList, B](rhs: PartialFunction[String, Request[A] ===> B]): Request[A] ===> B = this / dispatchPF(rhs)
     }
 
     /**
@@ -151,15 +152,15 @@ object Paths {
      *   case "bar" => pipeline
      *   case "baz" => pipeline
      */
-    def delegatePF[A](pf: PartialFunction[String, Request ===> A]): Request ===> A =
-        in => in.path match {
-            case head :: rest => pf.lift(head).map(_(in.copy(path=rest))) getOrElse Right(None)
+    def delegatePF[A <: HList, B](pf: PartialFunction[String, Request[A] ===> B]): Request[A] ===> B =
+        in => in.matchPath match {
+            case head :: rest => pf.lift(head).map(_(in.copy(matchPath=rest))) getOrElse Right(None)
             case Nil          => Right(None)
         }
 
     /** Dispatch by path using a partial function. Only matches if there is only one path segment remaining. */
-    def dispatchPF[A](pf: PartialFunction[String, Request ===> A]): Request ===> A =
-        in => in.path match {
+    def dispatchPF[A <: HList, B](pf: PartialFunction[String, Request[A] ===> B]): Request[A] ===> B =
+        in => in.matchPath match {
             case head :: _ => pf.lift(head).map(_(in)) getOrElse Right(None)
             case Nil       => Right(None)
         }

@@ -8,9 +8,7 @@ package object core {
      * or opt not to handle the input (Right(None))
      */
     type ===>[-A, +B] = A => Error[Option[B]]
-}
 
-package core {
     object Pipeline {
         /** Implicitly extend pipeline functions with composition operations */
         implicit def pipelineOps[A, B, C, D](in: (B ===> C) => (A ===> D)): PipelineOps[A, B, C, D] =
