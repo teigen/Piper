@@ -14,7 +14,7 @@ object Method extends Enumeration {
 }
 
 /** Basic HTTP request parameters */
-final case class Request[A <: HList](
+final case class Request[+A](
     /** The HTTP request method used for this request */
     method: Method.Value,
 
